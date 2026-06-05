@@ -3,7 +3,17 @@ name: CI code validation
 on:
   push:
     branches: [main, master]
+    paths:
+      - "src/**"
+      - "esbuild.config.mjs"
+      - "tsconfig.build.json"
+      - "package.json"
   pull_request:
+    paths:
+      - "src/**"
+      - "esbuild.config.mjs"
+      - "tsconfig.build.json"
+      - "package.json"
 
 jobs:
   check:
