@@ -1,0 +1,33 @@
+{
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.expand": false,
+  "explorer.fileNesting.patterns": {
+    ".env": "*.env, .env.*, .envrc, env.d.ts",
+
+    ".gitignore": ".gitattributes, .gitmodules",
+
+    "package.json": ".editorconfig, .eslint*, .gitpod*, .github*, .husky*, .npm*, .nvmrc, .prettier*, .release-please*.json, .releaserc*, .simple-git-hooks*, .vscode*, biome.json*, commitlint*, cspell*, eslint*, knip.*, lefthook.*, lint-staged*, npm-shrinkwrap.json, package-lock.json, pnpm*, prettier*, release.config.*, renovate*, rolldown.config.*, rollup.config.*, tsdown.config.*, esbuild.config.*, tsup.config.*, turbo*, typedoc*, webpack*, xo.config.*, yarn*",
+
+    "tsconfig.json": "tsconfig*.tsbuildinfo, tsconfig.*.json",
+
+    "vite.config.*": "*.env, .env.*, .envrc, env.d.ts, postcss.config.*, tailwind.config.*, tsconfig.*, vitest.config.*",
+
+    "*.ts": "$(capture).js, $(capture).d.ts, $(capture).d.ts.map, $(capture).*.ts, $(capture)_*.ts",
+
+    "*.tsx": "$(capture).ts, $(capture).*.ts, $(capture).*.tsx, $(capture)_*.ts, $(capture)_*.tsx, $(capture).css, $(capture).module.css, $(capture).scss, $(capture).module.scss, $(capture).css.ts",
+
+    "*.js": "$(capture).js.map, $(capture).*.js, $(capture)_*.js, $(capture).d.ts, $(capture).d.ts.map",
+
+    "*.mjs": "$(capture).mjs.map, $(capture).*.mjs, $(capture)_*.mjs",
+
+    "*.cjs": "$(capture).cjs.map, $(capture).*.cjs, $(capture)_*.cjs",
+
+    "*.mts": "$(capture).mts.map, $(capture).*.mts, $(capture)_*.mts",
+
+    "*.css": "$(capture).css.map, $(capture).*.css",
+
+    "*.md": "$(capture).*",
+
+    "README*": "AUTHORS, Authors, BACKERS*, Backers*, CHANGELOG*, CITATION*, CODEOWNERS, CODE_OF_CONDUCT*, CONTRIBUTING*, CONTRIBUTORS, CONTRIBUTORS.MD, CONTRIBUTORS.TXT, COPYING*, CREDITS, Changelog*, Citation*, Code_Of_Conduct*, Codeowners, Contributing*, Contributors, Contributors.md, Contributors.txt, Copying*, Credits, GOVERNANCE.MD, Governance.md, HISTORY.MD, History.md, LICENSE, LICENSE.MD, LICENSE.txt, License, License.md, License.txt, MAINTAINERS, Maintainers, README-*, README_*, RELEASE_NOTES*, ROADMAP.MD, Readme-*, Readme_*, Release_Notes*, Roadmap.md, SECURITY.MD, SPONSORS*, Security.md, Sponsors*, authors, backers*, changelog*, citation*, code_of_conduct*, codeowners, contributing*, contributors, contributors.md, contributors.txt, copying*, credits, governance.md, history.md, license, license.md, license.txt, maintainers, readme-*, readme_*, release_notes*, roadmap.md, security.md, sponsors*"
+  }
+}

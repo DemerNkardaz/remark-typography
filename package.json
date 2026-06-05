@@ -1,0 +1,74 @@
+{
+  "name": "@yalla/remark-typography",
+  "version": "1.0.0",
+  "description": "Your package description here",
+  "license": "MIT",
+  "author": "Yalla Nkardaz",
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DemerNkardaz/remark-typography"
+  },
+  "homepage": "https://github.com/DemerNkardaz/remark-typography#readme",
+  "bugs": {
+    "url": "https://github.com/DemerNkardaz/remark-typography/issues"
+  },
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "bundleSizeLimit": 102400,
+  "sideEffects": false,
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "build:js": "node esbuild.config.mjs",
+    "build:types": "tsc --project tsconfig.build.json --emitDeclarationOnly",
+    "build": "npm run build:js && npm run build:types",
+    "dev": "esbuild --watch",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json,md}\"",
+    "type-check": "tsc --noEmit",
+    "test": "vitest --run",
+    "test:coverage": "vitest --run --coverage",
+    "prepublishOnly": "npm run build && npm run lint && npm run type-check",
+    "knip": "knip"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^25.9.1",
+    "@vitest/coverage-v8": "^4.1.8",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.4.1",
+    "eslint-config-prettier": "^10.1.8",
+    "knip": "^6.15.0",
+    "prettier": "^3.0.0",
+    "remark-parse": "^11.0.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.60.1",
+    "unified": "^11.0.5",
+    "vite-tsconfig-paths": "^6.1.1",
+    "vitest": "^4.1.8"
+  },
+  "dependencies": {
+    "@yalla/typography-rules": "file:../typography-rules",
+    "unist-util-visit": "^5.1.0"
+  }
+}
