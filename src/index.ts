@@ -1,5 +1,6 @@
-import { visit, SKIP, type VisitorResult } from 'unist-util-visit';
-import type { Root, Text, Parent, Yaml } from 'mdast';
+import { visit } from 'unist-util-visit';
+import type { Root, Text, Parent, Yaml, Node } from 'mdast';
+import type { MdxJsxFlowElement, MdxJsxTextElement } from 'mdast-util-mdx-jsx';
 import yaml from 'js-yaml';
 
 import {
@@ -17,22 +18,34 @@ import {
 	PROTECTION_MARKER_REGEX,
 } from '@yalla/typography-rules/helpers';
 
-// Node types whose subtree must not be touched by typography rules.
-// Inline-code and block-code patterns are already handled by PROTECTED_PATTERNS
-// at the text level, but we also skip the mdast nodes so we never even enter them.
 const EXCLUDED_TYPES = new Set([
-	'code', // fenced / indented code block
-	'inlineCode', // `backtick` spans
-	'math', // remark-math block
-	'inlineMath', // remark-math inline
-	'html', // raw HTML blocks — content is opaque markup, not prose
-	'yaml', // frontmatter (remark-frontmatter)
-	'toml', // frontmatter (remark-frontmatter)
+	'code',
+	'inlineCode',
+	'math',
+	'inlineMath',
+	'html',
+	'yaml',
+	'toml',
 ]);
+
+const JSX_TYPES = new Set(['mdxJsxFlowElement', 'mdxJsxTextElement']);
 
 export interface RemarkTypographyOptions {
 	locale?: keyof typeof typographyRules;
 	plugins?: (() => () => void)[];
+}
+
+function getJsxLang(node: MdxJsxFlowElement | MdxJsxTextElement): string | undefined {
+	for (const attr of node.attributes) {
+		if (
+			attr.type === 'mdxJsxAttribute' &&
+			(attr.name === 'lang' || attr.name === 'language' || attr.name === 'locale') &&
+			typeof attr.value === 'string'
+		) {
+			return attr.value;
+		}
+	}
+	return undefined;
 }
 
 export function remarkTypography(options: RemarkTypographyOptions = {}) {
@@ -55,27 +68,15 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 				(typeof data['language'] === 'string' ? data['language'] : undefined);
 		});
 
-		const locale = frontmatterLocale ?? options.locale ?? 'en';
-		const hasLocaleRules = !!typographyRules[locale];
+		const fileLocale = frontmatterLocale ?? options.locale ?? 'en';
 
-		if (!hasLocaleRules) {
-			console.warn(
-				`[@yalla/remark-typography] No rules registered for locale "${locale}", ` +
-					`only common rules will be applied.`
-			);
-		}
+		function applyRules(text: string, locale: string): string {
+			const rules = getWeightedRules(locale);
+			if (rules.length === 0) return text;
 
-		const rules = getWeightedRules(locale);
-
-		if (rules.length === 0) return;
-
-		function applyRules(text: string): string {
 			let value = text;
 			const protectedMatches: string[] = [];
 
-			// Protect special sequences before applying rules.
-			// NODE_MARKER must be protected first so rules cannot corrupt
-			// the inter-node boundary markers.
 			value = value.replace(NODE_MARKER_REGEX, (match) => {
 				protectedMatches.push(match);
 				return PROTECTION_MARKER;
@@ -101,7 +102,6 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 							value = funcItem.rule(value, ...(funcItem.args ?? []));
 							break;
 						}
-
 						case 'transform': {
 							const transformItem = item as RegExpTransformRule;
 							value = value.replace(transformItem.rule, (match: string, ...groups: unknown[]) => {
@@ -110,7 +110,6 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 							});
 							break;
 						}
-
 						case 'replace': {
 							const replaceItem = item as RegExpReplaceRule;
 							value = value.replace(replaceItem.rule, replaceItem.replacement);
@@ -125,44 +124,93 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 			return value.replace(PROTECTION_MARKER_REGEX, () => protectedMatches.shift() ?? '');
 		}
 
-		visit(tree, (node): VisitorResult => {
-			// Stop descending into excluded subtrees entirely.
-			if (EXCLUDED_TYPES.has(node.type)) {
-				return SKIP;
-			}
+		function processNode(node: Node, localeStack: string[]): void {
+			if (EXCLUDED_TYPES.has(node.type)) return;
 
-			// We only care about nodes that have children.
-			if (!('children' in node)) {
+			const currentLocale = localeStack[localeStack.length - 1] ?? fileLocale;
+
+			// Check if this JSX node declares a lang attribute
+			if (JSX_TYPES.has(node.type)) {
+				const jsxNode = node as MdxJsxFlowElement | MdxJsxTextElement;
+				const jsxLang = getJsxLang(jsxNode);
+
+				if (jsxLang) {
+					if (!typographyRules[jsxLang]) {
+						console.warn(
+							`[@yalla/remark-typography] No rules registered for locale "${jsxLang}" ` +
+								`on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`
+						);
+					}
+					localeStack.push(jsxLang);
+				}
+
+				const currentLocale = localeStack[localeStack.length - 1];
+
+				if ('children' in jsxNode) {
+					// Process direct text children of this JSX node
+					const directTextNodes = jsxNode.children.filter(
+						(child): child is Text => child.type === 'text'
+					);
+
+					if (directTextNodes.length > 0) {
+						const combinedText = directTextNodes.map((n) => n.value).join(NODE_MARKER);
+						const transformedText = applyRules(combinedText, currentLocale as string);
+						const segments = transformedText.split(NODE_MARKER);
+						directTextNodes.forEach((n, i) => {
+							n.value = segments[i] ?? n.value;
+						});
+					}
+
+					// Recurse into non-text children
+					for (const child of jsxNode.children) {
+						if (child.type !== 'text') {
+							processNode(child as Node, localeStack);
+						}
+					}
+				}
+
+				if (jsxLang) localeStack.pop();
 				return;
 			}
 
+			if (!('children' in node)) return;
+
 			const parent = node as Parent;
 
-			// Collect only the *direct* text-node children.
-			// visit() already walks the whole tree recursively, so we must NOT
-			// recurse again here — doing so causes every text node to be processed
-			// once per ancestor level (grandparent, great-grandparent, …).
 			const directTextNodes = parent.children.filter(
 				(child): child is Text => child.type === 'text'
 			);
 
-			if (directTextNodes.length === 0) {
-				return;
+			if (directTextNodes.length > 0) {
+				const combinedText = directTextNodes.map((n) => n.value).join(NODE_MARKER);
+				const transformedText = applyRules(combinedText, currentLocale);
+				const segments = transformedText.split(NODE_MARKER);
+
+				directTextNodes.forEach((n, i) => {
+					n.value = segments[i] ?? n.value;
+				});
 			}
 
-			// Join sibling text nodes with NODE_MARKER so that rules which rely on
-			// surrounding context (e.g. space before/after punctuation) see a single
-			// coherent string rather than isolated fragments.
-			const combinedText = directTextNodes.map((n) => n.value).join(NODE_MARKER);
-			const transformedText = applyRules(combinedText);
-			const segments = transformedText.split(NODE_MARKER);
+			// Recurse into non-text children
+			for (const child of parent.children) {
+				if (child.type !== 'text') {
+					processNode(child as Node, localeStack);
+				}
+			}
+		}
 
-			directTextNodes.forEach((n, i) => {
-				// Fallback to original value if segments are out of sync —
-				// can happen if a rule accidentally removes a NODE_MARKER.
-				n.value = segments[i] ?? n.value;
-			});
-		});
+		// Warn once for file locale if no rules
+		if (!typographyRules[fileLocale]) {
+			console.warn(
+				`[@yalla/remark-typography] No rules registered for locale "${fileLocale}", ` +
+					`only common rules will be applied.`
+			);
+		}
+
+		const rules = getWeightedRules(fileLocale);
+		if (rules.length === 0) return;
+
+		processNode(tree, [fileLocale]);
 	};
 }
 

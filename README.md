@@ -1,5 +1,23 @@
 # @yalla/remark-typography
 
+@yalla/remark-typography is a Remark plugin that automatically applies
+typography rules to your MDX files. This includes replacing straight quotes with
+smart quotes, adjusting punctuation, adding non-breaking spaces, and more.
+
+This plugin is specifically designed for MDX files. Proper functionality with
+standard Markdown (MD) files is not guaranteed.
+
+### Key Features
+
+- **Configuration:** You can set localization rules globally (in
+  `vite.config.ts`), for a specific file (via Frontmatter), or locally for an
+  individual node.
+- **Extensibility:** Use `@yalla/typography-rules` to define your own custom
+  text processing rules.
+- **Integration:** The plugin is simple to set up within your Remark pipeline
+  and supports the execution order required for correct document structure
+  processing.
+
 ## Usage
 
 ```bash
@@ -7,6 +25,7 @@ npm i -D @yalla/remark-typography
 ```
 
 `vite.config.ts`
+
 ```typescript
 import remarkTypography from '@yalla/remark-typography';
 import remarkFrontmatter from 'remark-frontmatter';
@@ -20,7 +39,15 @@ export default {
         remarkPlugins: [
           remarkFrontmatter,
           // other remark plugins
-          [remarkTypography, { locale: 'ru' }],
+          [
+            remarkTypography,
+            {
+              plugins: [
+                /* supplemental plugins */
+              ],
+              locale: 'ru',
+            },
+          ],
           // other remark plugins
         ],
       }),
@@ -31,8 +58,8 @@ export default {
 
 ### Per-file locale override
 
-You can override the locale for a specific file via frontmatter.
-Supported keys in order of priority: `locale`, `lang`, `language`.
+You can override the locale for a specific file via frontmatter. Supported keys
+in order of priority: `locale`, `lang`, `language`.
 
 ```mdx
 ---
@@ -42,23 +69,29 @@ locale: ru
 Текст на русском языке…
 ```
 
-> `remark-frontmatter` must be placed before `remarkTypography` in `remarkPlugins`
-> for per-file locale override to work.
+### Per-node locale override
+
+You can override the locale for a specific node via inline attribute syntax.
+
+```mdx
+<p lang="is">Þessi texti er íslenska: 1, 2, 3, "10"</p>
+// Result: Þessi texti er íslenska: einn, tveir, þrír, „tíu“
+
+// Note: “is” not a built-in locale, see next “@yalla/typography-rules” section
+with example.
+```
+
+> `remark-frontmatter` must be placed before `remarkTypography` in
+> `remarkPlugins` for per-file locale override to work.
 
 ### Options
 
-| Option    | Type                      | Default | Description                                      |
-| --------- | ------------------------- | ------- | ------------------------------------------------ |
-| `locale`  | `string`                  | `'en'`  | Locale to use for typography rules               |
-| `plugins` | `(() => () => void)[]`    | `[]`    | Custom rule plugins to register before processing |
+| Option    | Type                   | Default | Description                                       |
+| --------- | ---------------------- | ------- | ------------------------------------------------- |
+| `locale`  | `string`               | `'en'`  | Locale to use for typography rules                |
+| `plugins` | `(() => () => void)[]` | `[]`    | Custom rule plugins to register before processing |
 
-## Plugin Order
-
-`@yalla/remark-typography` must be placed **after** plugins that modify or
-introduce text nodes, and **before** plugins that consume the final text
-content.
-
-### [@yalla/typography-rules](https://github.com/DemerNkardaz/typography-rules)
+## [@yalla/typography-rules](https://github.com/DemerNkardaz/typography-rules)
 
 If you want to customize awailable typography rules, use
 `@yalla/typography-rules` and configure your own `<plugin>.ts` file. Example:
@@ -140,6 +173,12 @@ export default {
   ],
 };
 ```
+
+## Plugin Order
+
+`@yalla/remark-typography` must be placed **after** plugins that modify or
+introduce text nodes, and **before** plugins that consume the final text
+content.
 
 ### Place remark-typography AFTER these plugins
 
