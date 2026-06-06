@@ -6,6 +6,7 @@ import yaml from 'js-yaml';
 import {
 	getWeightedRules,
 	typographyRules,
+	applyDefaultRules,
 	type FunctionRule,
 	type RegExpReplaceRule,
 	type RegExpTransformRule,
@@ -31,8 +32,10 @@ const EXCLUDED_TYPES = new Set([
 const JSX_TYPES = new Set(['mdxJsxFlowElement', 'mdxJsxTextElement']);
 
 export interface RemarkTypographyOptions {
+	initDefaultRules?: boolean;
 	locale?: keyof typeof typographyRules;
 	plugins?: (() => () => void)[];
+	logs?: boolean;
 }
 
 function getJsxLang(node: MdxJsxFlowElement | MdxJsxTextElement): string | undefined {
@@ -48,15 +51,27 @@ function getJsxLang(node: MdxJsxFlowElement | MdxJsxTextElement): string | undef
 	return undefined;
 }
 
-export function remarkTypography(options: RemarkTypographyOptions = {}) {
-	let pluginsInitialized = false;
+function warning(message: string, showLogs: boolean): void {
+	if (showLogs) {
+		console.warn(`[@yalla/remark-typography] ${message}`);
+	}
+}
+
+export function remarkTypography(options: RemarkTypographyOptions = {} as RemarkTypographyOptions) {
+	const config = {
+		initDefaultRules: true,
+		logs: false,
+		locale: 'en',
+		...options,
+	} satisfies RemarkTypographyOptions;
+
+	if (config.initDefaultRules) {
+		applyDefaultRules();
+	}
+
+	config.plugins?.forEach((plugin) => plugin()());
 
 	return (tree: Root) => {
-		if (!pluginsInitialized) {
-			options.plugins?.forEach((plugin) => plugin()());
-			pluginsInitialized = true;
-		}
-
 		let frontmatterLocale: string | undefined;
 		visit(tree, 'yaml', (node: Yaml) => {
 			const data = yaml.load(node.value) as Record<string, unknown> | null;
@@ -68,7 +83,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 				(typeof data['language'] === 'string' ? data['language'] : undefined);
 		});
 
-		const fileLocale = frontmatterLocale ?? options.locale ?? 'en';
+		const fileLocale = frontmatterLocale ?? config.locale ?? 'en';
 
 		function applyRules(text: string, locale: string): string {
 			const rules = getWeightedRules(locale);
@@ -91,7 +106,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 
 			for (const item of rules) {
 				if (!item || !item.kind) {
-					console.warn('[@yalla/remark-typography] Skipping invalid rule:', item);
+					if (config.logs) console.warn('[@yalla/remark-typography] Skipping invalid rule:', item);
 					continue;
 				}
 
@@ -117,7 +132,8 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 						}
 					}
 				} catch (err) {
-					console.warn('[@yalla/remark-typography] Rule threw an error, skipping:', item, err);
+					if (config.logs)
+						console.warn('[@yalla/remark-typography] Rule threw an error, skipping:', item, err);
 				}
 			}
 
@@ -136,9 +152,11 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 
 				if (jsxLang) {
 					if (!typographyRules[jsxLang]) {
-						console.warn(
-							`[@yalla/remark-typography] No rules registered for locale "${jsxLang}" ` +
-								`on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`
+						warning(
+							!typographyRules['common'] || typographyRules['common'].length === 0
+								? `No rules registered for both of common and “${jsxLang}” locales on <${jsxNode.name ?? 'unknown'}> node.`
+								: `No rules registered for locale "${jsxLang}" on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`,
+							config.logs
 						);
 					}
 					localeStack.push(jsxLang);
@@ -201,9 +219,11 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 
 		// Warn once for file locale if no rules
 		if (!typographyRules[fileLocale]) {
-			console.warn(
-				`[@yalla/remark-typography] No rules registered for locale "${fileLocale}", ` +
-					`only common rules will be applied.`
+			warning(
+				!typographyRules['common'] || typographyRules['common'].length === 0
+					? `No rules registered for both of common and “${fileLocale}” locales.`
+					: `No rules registered for locale "${fileLocale}", only common rules will be applied.`,
+				config.logs
 			);
 		}
 

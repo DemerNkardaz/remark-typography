@@ -45,7 +45,9 @@ export default {
               plugins: [
                 /* supplemental plugins */
               ],
-              locale: 'ru',
+              initDefaultRules: true, // default: true
+              logs: false, // console logs; default: false
+              locale: 'en', // default: 'en'
             },
           ],
           // other remark plugins
