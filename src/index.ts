@@ -5,8 +5,9 @@ import yaml from 'js-yaml';
 
 import {
 	getWeightedRules,
-	typographyRules,
 	applyDefaultRules,
+	rulesCount,
+	rulesHas,
 	type FunctionRule,
 	type RegExpReplaceRule,
 	type RegExpTransformRule,
@@ -33,7 +34,7 @@ const JSX_TYPES = new Set(['mdxJsxFlowElement', 'mdxJsxTextElement']);
 
 export interface RemarkTypographyOptions {
 	initDefaultRules?: boolean;
-	locale?: keyof typeof typographyRules;
+	locale?: string;
 	plugins?: (() => () => void)[];
 	logs?: boolean;
 }
@@ -97,11 +98,11 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 				return PROTECTION_MARKER;
 			});
 
-			PROTECTED_PATTERNS.values.forEach((regex) => {
-				value = value.replace(regex, (match) => {
-					protectedMatches.push(match);
-					return PROTECTION_MARKER;
-				});
+			const combinedProtectionRegex = PROTECTED_PATTERNS.combined();
+
+			value = value.replace(combinedProtectionRegex, (match) => {
+				protectedMatches.push(match);
+				return PROTECTION_MARKER;
 			});
 
 			for (const item of rules) {
@@ -151,9 +152,9 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 				const jsxLang = getJsxLang(jsxNode);
 
 				if (jsxLang) {
-					if (!typographyRules[jsxLang]) {
+					if (!rulesHas(fileLocale)) {
 						warning(
-							!typographyRules['common'] || typographyRules['common'].length === 0
+							!rulesHas('common') || rulesCount('common') === 0
 								? `No rules registered for both of common and “${jsxLang}” locales on <${jsxNode.name ?? 'unknown'}> node.`
 								: `No rules registered for locale "${jsxLang}" on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`,
 							config.logs
@@ -218,9 +219,9 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 		}
 
 		// Warn once for file locale if no rules
-		if (!typographyRules[fileLocale]) {
+		if (!rulesHas(fileLocale)) {
 			warning(
-				!typographyRules['common'] || typographyRules['common'].length === 0
+				!rulesHas('common') || rulesCount('common') === 0
 					? `No rules registered for both of common and “${fileLocale}” locales.`
 					: `No rules registered for locale "${fileLocale}", only common rules will be applied.`,
 				config.logs
