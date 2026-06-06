@@ -51,6 +51,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/js-yaml": "^4.0.9",
     "@types/mdast": "^4.0.4",
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^4.1.8",
@@ -69,6 +70,7 @@
   },
   "dependencies": {
     "@yalla/typography-rules": "file:../typography-rules",
+    "js-yaml": "^4.2.0",
     "unist-util-visit": "^5.1.0"
   }
 }

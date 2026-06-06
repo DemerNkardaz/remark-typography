@@ -1,5 +1,6 @@
 import { visit, SKIP, type VisitorResult } from 'unist-util-visit';
-import type { Root, Text, Parent } from 'mdast';
+import type { Root, Text, Parent, Yaml } from 'mdast';
+import yaml from 'js-yaml';
 
 import {
 	getWeightedRules,
@@ -12,6 +13,8 @@ import {
 	NODE_MARKER,
 	PROTECTED_PATTERNS,
 	PROTECTION_MARKER,
+	NODE_MARKER_REGEX,
+	PROTECTION_MARKER_REGEX,
 } from '@yalla/typography-rules/helpers';
 
 // Node types whose subtree must not be touched by typography rules.
@@ -27,9 +30,41 @@ const EXCLUDED_TYPES = new Set([
 	'toml', // frontmatter (remark-frontmatter)
 ]);
 
-export function remarkTypography(options: { locale?: 'ru' | 'en' } = { locale: 'ru' }) {
+export interface RemarkTypographyOptions {
+	locale?: keyof typeof typographyRules;
+	plugins?: (() => () => void)[];
+}
+
+export function remarkTypography(options: RemarkTypographyOptions = {}) {
+	let pluginsInitialized = false;
+
 	return (tree: Root) => {
-		const locale = options.locale as keyof typeof typographyRules;
+		if (!pluginsInitialized) {
+			options.plugins?.forEach((plugin) => plugin()());
+			pluginsInitialized = true;
+		}
+
+		let frontmatterLocale: string | undefined;
+		visit(tree, 'yaml', (node: Yaml) => {
+			const data = yaml.load(node.value) as Record<string, unknown> | null;
+			if (!data) return;
+
+			frontmatterLocale =
+				(typeof data['locale'] === 'string' ? data['locale'] : undefined) ??
+				(typeof data['lang'] === 'string' ? data['lang'] : undefined) ??
+				(typeof data['language'] === 'string' ? data['language'] : undefined);
+		});
+
+		const locale = frontmatterLocale ?? options.locale ?? 'en';
+		const hasLocaleRules = !!typographyRules[locale];
+
+		if (!hasLocaleRules) {
+			console.warn(
+				`[@yalla/remark-typography] No rules registered for locale "${locale}", ` +
+					`only common rules will be applied.`
+			);
+		}
+
 		const rules = getWeightedRules(locale);
 
 		if (rules.length === 0) return;
@@ -37,6 +72,14 @@ export function remarkTypography(options: { locale?: 'ru' | 'en' } = { locale: '
 		function applyRules(text: string): string {
 			let value = text;
 			const protectedMatches: string[] = [];
+
+			// Protect special sequences before applying rules.
+			// NODE_MARKER must be protected first so rules cannot corrupt
+			// the inter-node boundary markers.
+			value = value.replace(NODE_MARKER_REGEX, (match) => {
+				protectedMatches.push(match);
+				return PROTECTION_MARKER;
+			});
 
 			PROTECTED_PATTERNS.values.forEach((regex) => {
 				value = value.replace(regex, (match) => {
@@ -46,36 +89,40 @@ export function remarkTypography(options: { locale?: 'ru' | 'en' } = { locale: '
 			});
 
 			for (const item of rules) {
-				if (!item || !item.kind) continue;
+				if (!item || !item.kind) {
+					console.warn('[@yalla/remark-typography] Skipping invalid rule:', item);
+					continue;
+				}
 
-				switch (item.kind) {
-					case 'function': {
-						const funcItem = item as FunctionRule;
-						value = funcItem.rule(value, ...(funcItem.args ?? []));
-						break;
-					}
+				try {
+					switch (item.kind) {
+						case 'function': {
+							const funcItem = item as FunctionRule;
+							value = funcItem.rule(value, ...(funcItem.args ?? []));
+							break;
+						}
 
-					case 'transform': {
-						const transformItem = item as RegExpTransformRule;
-						value = value.replace(transformItem.rule, (match: string, ...groups: unknown[]) => {
-							const regexArray = [match, ...groups] as unknown as RegExpExecArray;
-							return transformItem.transform(regexArray);
-						});
-						break;
-					}
+						case 'transform': {
+							const transformItem = item as RegExpTransformRule;
+							value = value.replace(transformItem.rule, (match: string, ...groups: unknown[]) => {
+								const regexArray = [match, ...groups] as unknown as RegExpExecArray;
+								return transformItem.transform(regexArray);
+							});
+							break;
+						}
 
-					case 'replace': {
-						const replaceItem = item as RegExpReplaceRule;
-						value = value.replace(replaceItem.rule, replaceItem.replacement);
-						break;
+						case 'replace': {
+							const replaceItem = item as RegExpReplaceRule;
+							value = value.replace(replaceItem.rule, replaceItem.replacement);
+							break;
+						}
 					}
+				} catch (err) {
+					console.warn('[@yalla/remark-typography] Rule threw an error, skipping:', item, err);
 				}
 			}
 
-			return value.replace(
-				new RegExp(PROTECTION_MARKER, 'g'),
-				() => protectedMatches.shift() || ''
-			);
+			return value.replace(PROTECTION_MARKER_REGEX, () => protectedMatches.shift() ?? '');
 		}
 
 		visit(tree, (node): VisitorResult => {
@@ -111,9 +158,9 @@ export function remarkTypography(options: { locale?: 'ru' | 'en' } = { locale: '
 			const segments = transformedText.split(NODE_MARKER);
 
 			directTextNodes.forEach((n, i) => {
-				if (segments[i] !== undefined) {
-					n.value = segments[i];
-				}
+				// Fallback to original value if segments are out of sync —
+				// can happen if a rule accidentally removes a NODE_MARKER.
+				n.value = segments[i] ?? n.value;
 			});
 		});
 	};
