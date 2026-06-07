@@ -8,6 +8,7 @@ import {
 	applyDefaultRules,
 	rulesCount,
 	rulesHas,
+	isRuleDisabled,
 	type FunctionRule,
 	type RegExpReplaceRule,
 	type RegExpTransformRule,
@@ -91,6 +92,10 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 			for (const item of rules) {
 				if (!item || !item.kind) {
 					if (config.logs) console.warn('[@yalla/remark-typography] Skipping invalid rule:', item);
+					continue;
+				}
+
+				if (item.label && isRuleDisabled(item.label)) {
 					continue;
 				}
 
