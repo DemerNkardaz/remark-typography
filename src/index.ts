@@ -12,13 +12,7 @@ import {
 	type RegExpReplaceRule,
 	type RegExpTransformRule,
 } from '@yalla/typography-rules';
-import {
-	NODE_MARKER,
-	PROTECTED_PATTERNS,
-	PROTECTION_MARKER,
-	NODE_MARKER_REGEX,
-	PROTECTION_MARKER_REGEX,
-} from '@yalla/typography-rules/helpers';
+import { joinNodes, protect, splitNodes, unprotect } from '@yalla/typography-rules/helpers';
 
 const EXCLUDED_TYPES = new Set([
 	'code',
@@ -90,20 +84,9 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 			const rules = getWeightedRules(locale);
 			if (rules.length === 0) return text;
 
-			let value = text;
-			const protectedMatches: string[] = [];
+			const [initialProtectedValue, protectedMatches] = protect(text);
 
-			value = value.replace(NODE_MARKER_REGEX, (match) => {
-				protectedMatches.push(match);
-				return PROTECTION_MARKER;
-			});
-
-			const combinedProtectionRegex = PROTECTED_PATTERNS.combined();
-
-			value = value.replace(combinedProtectionRegex, (match) => {
-				protectedMatches.push(match);
-				return PROTECTION_MARKER;
-			});
+			let value = initialProtectedValue;
 
 			for (const item of rules) {
 				if (!item || !item.kind) {
@@ -138,7 +121,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 				}
 			}
 
-			return value.replace(PROTECTION_MARKER_REGEX, () => protectedMatches.shift() ?? '');
+			return unprotect(value, protectedMatches);
 		}
 
 		function processNode(node: Node, localeStack: string[]): void {
@@ -156,7 +139,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 						warning(
 							!rulesHas('common') || rulesCount('common') === 0
 								? `No rules registered for both of common and “${jsxLang}” locales on <${jsxNode.name ?? 'unknown'}> node.`
-								: `No rules registered for locale "${jsxLang}" on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`,
+								: `No rules registered for locale “${jsxLang}” on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`,
 							config.logs
 						);
 					}
@@ -172,12 +155,9 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 					);
 
 					if (directTextNodes.length > 0) {
-						const combinedText = directTextNodes.map((n) => n.value).join(NODE_MARKER);
+						const combinedText = joinNodes(directTextNodes);
 						const transformedText = applyRules(combinedText, currentLocale as string);
-						const segments = transformedText.split(NODE_MARKER);
-						directTextNodes.forEach((n, i) => {
-							n.value = segments[i] ?? n.value;
-						});
+						splitNodes(transformedText, directTextNodes);
 					}
 
 					// Recurse into non-text children
@@ -201,13 +181,9 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 			);
 
 			if (directTextNodes.length > 0) {
-				const combinedText = directTextNodes.map((n) => n.value).join(NODE_MARKER);
+				const combinedText = joinNodes(directTextNodes);
 				const transformedText = applyRules(combinedText, currentLocale);
-				const segments = transformedText.split(NODE_MARKER);
-
-				directTextNodes.forEach((n, i) => {
-					n.value = segments[i] ?? n.value;
-				});
+				splitNodes(transformedText, directTextNodes);
 			}
 
 			// Recurse into non-text children
@@ -223,7 +199,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 			warning(
 				!rulesHas('common') || rulesCount('common') === 0
 					? `No rules registered for both of common and “${fileLocale}” locales.`
-					: `No rules registered for locale "${fileLocale}", only common rules will be applied.`,
+					: `No rules registered for locale “${fileLocale}”, only common rules will be applied.`,
 				config.logs
 			);
 		}

@@ -4,7 +4,16 @@
   "description": "Your package description here",
   "license": "MIT",
   "author": "Yalla Nkardaz",
-  "keywords": [],
+  "keywords": [
+    "typography",
+    "russian",
+    "english",
+    "text",
+    "markdown",
+    "unified",
+    "remark",
+    "remark-plugin"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/DemerNkardaz/remark-typography"
