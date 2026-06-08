@@ -26,14 +26,14 @@ const resultMJS = await build({
 	entryPoints: ['src/index.ts'],
 	format: 'esm',
 	outfile: 'dist/index.mjs',
-	external: ['@yalla/typography-rules', 'unist-util-visit', 'js-yaml'],
+	external: ['@yalla/typography-rules', '@yalla/typography-core', 'unist-util-visit', 'js-yaml'],
 });
 const resultCJS = await build({
 	...common,
 	entryPoints: ['src/index.ts'],
 	format: 'cjs',
 	outfile: 'dist/index.cjs',
-	external: ['@yalla/typography-rules', 'unist-util-visit', 'js-yaml'],
+	external: ['@yalla/typography-rules', '@yalla/typography-core', 'unist-util-visit', 'js-yaml'],
 });
 
 await writeFile('dist/meta-esm.json', JSON.stringify(resultMJS.metafile));

@@ -5,7 +5,6 @@ import yaml from 'js-yaml';
 
 import {
 	getWeightedRules,
-	applyDefaultRules,
 	rulesCount,
 	rulesHas,
 	isRuleDisabled,
@@ -13,10 +12,16 @@ import {
 	nodeToMdast,
 	type NodeFunctionRule,
 	type FunctionRule,
-	type RegExpReplaceRule,
-	type RegExpTransformRule,
 } from '@yalla/typography-rules';
-import { joinNodes, protect, splitNodes, unprotect } from '@yalla/typography-rules/helpers';
+import { joinNodes, splitNodes } from '@yalla/typography-rules/helpers';
+
+import {
+	applyRules,
+	initRules,
+	getFrontmatterLocale,
+	warning,
+	type TypographyCoreOptions,
+} from '@yalla/typography-core';
 
 const EXCLUDED_TYPES = new Set([
 	'code',
@@ -30,12 +35,7 @@ const EXCLUDED_TYPES = new Set([
 
 const JSX_TYPES = new Set(['mdxJsxFlowElement', 'mdxJsxTextElement']);
 
-export interface RemarkTypographyOptions {
-	initDefaultRules?: boolean;
-	locale?: string;
-	plugins?: (() => () => void)[];
-	logs?: boolean;
-}
+export type RemarkTypographyOptions = TypographyCoreOptions;
 
 function getJsxLang(node: MdxJsxFlowElement | MdxJsxTextElement): string | undefined {
 	for (const attr of node.attributes) {
@@ -50,68 +50,17 @@ function getJsxLang(node: MdxJsxFlowElement | MdxJsxTextElement): string | undef
 	return undefined;
 }
 
-function warning(message: string, showLogs: boolean): void {
-	if (showLogs) {
-		console.warn(`[@yalla/remark-typography] ${message}`);
-	}
-}
-
-/**
- * Remark plugin that applies typography rules to MDX text nodes.
- *
- * Processes all non-excluded text nodes in two sequential phases:
- * 1. **String phase** — `replace`, `transform`, and `function` rules that return a string.
- *    Text is protected (URLs, emails, code spans, etc. are shielded) before rules run,
- *    then unprotected afterward.
- * 2. **Node phase** — `node` and `function` rules that return `Node[]`.
- *    Text nodes are split into mixed text/element arrays and spliced back into the tree.
- *
- * Excluded node types (never modified): `code`, `inlineCode`, `math`, `inlineMath`,
- * `html`, `yaml`, `toml`.
- *
- * Locale is resolved per-node in this order:
- * - `lang` / `language` / `locale` attribute on JSX elements
- * - `locale` / `lang` / `language` key in YAML frontmatter
- * - `options.locale`
- * - `'en'` (fallback)
- *
- * @param options - Plugin configuration
- * @param options.locale - Default locale for typography rules. Default: `'en'`
- * @param options.initDefaultRules - Register all built-in rules from `@yalla/typography-rules` on init. Default: `true`
- * @param options.plugins - Custom rule plugins to register before processing. Each entry is a `() => () => void` factory.
- * @param options.logs - Emit console warnings for missing locale rules and rule-level errors. Default: `false`
- *
- * @returns A unified/remark transformer function `(tree: Root) => void`
- *
- * @example
- * // vite.config.ts
- * import remarkTypography from '@yalla/remark-typography';
- * import remarkFrontmatter from 'remark-frontmatter';
- *
- * remarkPlugins: [
- *   remarkFrontmatter,
- *   [remarkTypography, { locale: 'ru', logs: true }],
- * ]
- *
- * @example
- * // With a custom plugin
- * import myRules from './plugins/myRules';
- *
- * remarkPlugins: [
- *   [remarkTypography, { plugins: [myRules], locale: 'de' }],
- * ]
- */
-export function remarkTypography(options: RemarkTypographyOptions = {} as RemarkTypographyOptions) {
+export function remarkTypography(options: RemarkTypographyOptions = {}) {
 	const config = {
-		initDefaultRules: true,
+		initTypographyRules: true,
+		initMarkupRules: false,
 		logs: false,
 		locale: 'en',
+		plugins: [],
 		...options,
-	} satisfies RemarkTypographyOptions;
+	} satisfies TypographyCoreOptions;
 
-	if (config.initDefaultRules) {
-		applyDefaultRules();
-	}
+	initRules(config);
 
 	config.plugins?.forEach((plugin) => plugin()());
 
@@ -119,62 +68,10 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 		let frontmatterLocale: string | undefined;
 		visit(tree, 'yaml', (node: Yaml) => {
 			const data = yaml.load(node.value) as Record<string, unknown> | null;
-			if (!data) return;
-
-			frontmatterLocale =
-				(typeof data['locale'] === 'string' ? data['locale'] : undefined) ??
-				(typeof data['lang'] === 'string' ? data['lang'] : undefined) ??
-				(typeof data['language'] === 'string' ? data['language'] : undefined);
+			frontmatterLocale = getFrontmatterLocale(data);
 		});
 
 		const fileLocale = frontmatterLocale ?? config.locale ?? 'en';
-
-		function applyRules(text: string, locale: string): string {
-			const rules = getWeightedRules(locale);
-			if (rules.length === 0) return text;
-
-			const [initialProtectedValue, protectedMatches] = protect(text);
-			let value = initialProtectedValue;
-
-			for (const item of rules) {
-				if (!item?.kind) {
-					if (config.logs) console.warn('[@yalla/remark-typography] Skipping invalid rule:', item);
-					continue;
-				}
-
-				if (item.label && isRuleDisabled(item.label)) continue;
-				if (item.kind === 'node') continue;
-
-				try {
-					switch (item.kind) {
-						case 'function': {
-							const funcItem = item as FunctionRule;
-							const result = funcItem.rule(value, ...(funcItem.args ?? []));
-							if (typeof result === 'string') value = result;
-							break;
-						}
-						case 'transform': {
-							const transformItem = item as RegExpTransformRule;
-							value = value.replace(transformItem.rule, (match: string, ...groups: unknown[]) => {
-								const regexArray = [match, ...groups] as unknown as RegExpExecArray;
-								return transformItem.transform(regexArray);
-							});
-							break;
-						}
-						case 'replace': {
-							const replaceItem = item as RegExpReplaceRule;
-							value = value.replace(replaceItem.rule, replaceItem.replacement);
-							break;
-						}
-					}
-				} catch (err) {
-					if (config.logs)
-						console.warn('[@yalla/remark-typography] Rule threw an error, skipping:', item, err);
-				}
-			}
-
-			return unprotect(value, protectedMatches);
-		}
 
 		function applyNodeRules(textNodes: Text[], parent: Parent, locale: string): void {
 			const rules = getWeightedRules(locale).filter(
@@ -266,7 +163,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 
 					if (directTextNodes.length > 0) {
 						const combinedText = joinNodes(directTextNodes);
-						const transformedText = applyRules(combinedText, jsxLocale);
+						const transformedText = applyRules(combinedText, jsxLocale, { logs: config.logs });
 						splitNodes(transformedText, directTextNodes);
 						applyNodeRules(directTextNodes, jsxNode as unknown as Parent, jsxLocale);
 					}
@@ -292,7 +189,7 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 
 			if (directTextNodes.length > 0) {
 				const combinedText = joinNodes(directTextNodes);
-				const transformedText = applyRules(combinedText, currentLocale);
+				const transformedText = applyRules(combinedText, currentLocale, { logs: config.logs });
 				splitNodes(transformedText, directTextNodes);
 				applyNodeRules(directTextNodes, parent, currentLocale);
 			}

@@ -6,9 +6,13 @@
   "author": "Yalla Nkardaz",
   "keywords": [
     "typography",
+    "typographic",
+    "text-formatting",
+    "typesetting",
     "russian",
     "english",
     "text",
+    "mdast",
     "markdown",
     "unified",
     "remark",
@@ -80,6 +84,7 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
+    "@yalla/typography-core": "file:../typography-core",
     "@yalla/typography-rules": "file:../typography-rules",
     "js-yaml": "^4.2.0",
     "unist-util-visit": "^5.1.0"

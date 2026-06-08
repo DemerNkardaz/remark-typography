@@ -41,7 +41,7 @@ export default {
             remarkTypography,
             {
               locale: 'en',
-              initDefaultRules: true,
+              initTypographyRules: true,
               logs: false,
               plugins: [],
             },
@@ -60,7 +60,7 @@ export default {
 ```typescript
 export interface RemarkTypographyOptions {
   locale?: string;
-  initDefaultRules?: boolean;
+  initTypographyRules?: boolean;
   plugins?: (() => () => void)[];
   logs?: boolean;
 }
@@ -69,7 +69,8 @@ export interface RemarkTypographyOptions {
 | Option             | Type                   | Default  | Description                                                                                   |
 | ------------------ | ---------------------- | -------- | --------------------------------------------------------------------------------------------- |
 | `locale`           | `string`               | `'en'`   | Default locale used for typography rules                                                      |
-| `initDefaultRules` | `boolean`              | `true`   | Automatically registers all built-in rules from `@yalla/typography-rules` on plugin init      |
+| `initTypographyRules` | `boolean`              | `true`   | Automatically registers all built-in rules from `@yalla/typography-rules` on plugin init      |
+| `initMarkupRules` | `boolean`              | `false`   | Automatically registers all built-in markup rules from `@yalla/typography-rules` on plugin init      |
 | `plugins`          | `(() => () => void)[]` | `[]`     | Custom rule plugins to register before processing. Each plugin is a factory returning a thunk |
 | `logs`             | `boolean`              | `false`  | Enables console warnings for missing locale rules and rule errors during processing           |
 
