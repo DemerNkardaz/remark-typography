@@ -1,5 +1,5 @@
 import { visit } from 'unist-util-visit';
-import type { Root, Text, Parent, Yaml, Node } from 'mdast';
+import type { Root, Text, Parent, Yaml, RootContent } from 'mdast';
 import type { MdxJsxFlowElement, MdxJsxTextElement } from 'mdast-util-mdx-jsx';
 import yaml from 'js-yaml';
 
@@ -9,6 +9,9 @@ import {
 	rulesCount,
 	rulesHas,
 	isRuleDisabled,
+	htmlNode,
+	nodeToMdast,
+	type NodeFunctionRule,
 	type FunctionRule,
 	type RegExpReplaceRule,
 	type RegExpTransformRule,
@@ -86,24 +89,23 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 			if (rules.length === 0) return text;
 
 			const [initialProtectedValue, protectedMatches] = protect(text);
-
 			let value = initialProtectedValue;
 
 			for (const item of rules) {
-				if (!item || !item.kind) {
+				if (!item?.kind) {
 					if (config.logs) console.warn('[@yalla/remark-typography] Skipping invalid rule:', item);
 					continue;
 				}
 
-				if (item.label && isRuleDisabled(item.label)) {
-					continue;
-				}
+				if (item.label && isRuleDisabled(item.label)) continue;
+				if (item.kind === 'node') continue;
 
 				try {
 					switch (item.kind) {
 						case 'function': {
 							const funcItem = item as FunctionRule;
-							value = funcItem.rule(value, ...(funcItem.args ?? []));
+							const result = funcItem.rule(value, ...(funcItem.args ?? []));
+							if (typeof result === 'string') value = result;
 							break;
 						}
 						case 'transform': {
@@ -129,12 +131,71 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 			return unprotect(value, protectedMatches);
 		}
 
-		function processNode(node: Node, localeStack: string[]): void {
+		function applyNodeRules(textNodes: Text[], parent: Parent, locale: string): void {
+			const rules = getWeightedRules(locale).filter(
+				(r): r is NodeFunctionRule | FunctionRule => r.kind === 'node' || r.kind === 'function'
+			);
+			if (rules.length === 0) return;
+
+			for (const textNode of textNodes) {
+				let current: (Text | MdxJsxTextElement)[] = [textNode];
+
+				for (const rule of rules) {
+					if (rule.label && isRuleDisabled(rule.label)) continue;
+
+					const next: (Text | MdxJsxTextElement)[] = [];
+
+					for (const node of current) {
+						if (node.type !== 'text') {
+							next.push(node);
+							continue;
+						}
+
+						let nodeList: ReturnType<typeof htmlNode>;
+
+						if (rule.kind === 'node') {
+							const nodeRule = rule as NodeFunctionRule;
+							nodeList = htmlNode((node as Text).value, {
+								expression: nodeRule.rule,
+								nodes: nodeRule.nodes,
+							});
+						} else {
+							const funcRule = rule as FunctionRule;
+							const result = funcRule.rule((node as Text).value, ...(funcRule.args ?? []));
+							if (typeof result === 'string' || !Array.isArray(result)) {
+								next.push(node);
+								continue;
+							}
+							nodeList = result;
+						}
+
+						if (nodeList.length === 1 && nodeList[0]!.type === 'text') {
+							next.push(node);
+							continue;
+						}
+
+						for (const n of nodeList) {
+							next.push(nodeToMdast(n));
+						}
+					}
+
+					current = next;
+				}
+
+				if (current.length === 1 && current[0] === textNode) continue;
+
+				const index = parent.children.indexOf(textNode as RootContent);
+				if (index !== -1) {
+					parent.children.splice(index, 1, ...(current as RootContent[]));
+				}
+			}
+		}
+
+		function processNode(node: Root | RootContent, localeStack: string[]): void {
 			if (EXCLUDED_TYPES.has(node.type)) return;
 
 			const currentLocale = localeStack[localeStack.length - 1] ?? fileLocale;
 
-			// Check if this JSX node declares a lang attribute
 			if (JSX_TYPES.has(node.type)) {
 				const jsxNode = node as MdxJsxFlowElement | MdxJsxTextElement;
 				const jsxLang = getJsxLang(jsxNode);
@@ -143,32 +204,31 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 					if (!rulesHas(fileLocale)) {
 						warning(
 							!rulesHas('common') || rulesCount('common') === 0
-								? `No rules registered for both of common and “${jsxLang}” locales on <${jsxNode.name ?? 'unknown'}> node.`
-								: `No rules registered for locale “${jsxLang}” on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`,
+								? `No rules registered for both of common and "${jsxLang}" locales on <${jsxNode.name ?? 'unknown'}> node.`
+								: `No rules registered for locale "${jsxLang}" on <${jsxNode.name ?? 'unknown'}> node, only common rules will be applied.`,
 							config.logs
 						);
 					}
 					localeStack.push(jsxLang);
 				}
 
-				const currentLocale = localeStack[localeStack.length - 1];
+				const jsxLocale = localeStack[localeStack.length - 1] ?? fileLocale;
 
 				if ('children' in jsxNode) {
-					// Process direct text children of this JSX node
 					const directTextNodes = jsxNode.children.filter(
 						(child): child is Text => child.type === 'text'
 					);
 
 					if (directTextNodes.length > 0) {
 						const combinedText = joinNodes(directTextNodes);
-						const transformedText = applyRules(combinedText, currentLocale as string);
+						const transformedText = applyRules(combinedText, jsxLocale);
 						splitNodes(transformedText, directTextNodes);
+						applyNodeRules(directTextNodes, jsxNode as unknown as Parent, jsxLocale);
 					}
 
-					// Recurse into non-text children
 					for (const child of jsxNode.children) {
 						if (child.type !== 'text') {
-							processNode(child as Node, localeStack);
+							processNode(child as RootContent, localeStack);
 						}
 					}
 				}
@@ -189,22 +249,21 @@ export function remarkTypography(options: RemarkTypographyOptions = {} as Remark
 				const combinedText = joinNodes(directTextNodes);
 				const transformedText = applyRules(combinedText, currentLocale);
 				splitNodes(transformedText, directTextNodes);
+				applyNodeRules(directTextNodes, parent, currentLocale);
 			}
 
-			// Recurse into non-text children
 			for (const child of parent.children) {
 				if (child.type !== 'text') {
-					processNode(child as Node, localeStack);
+					processNode(child as RootContent, localeStack);
 				}
 			}
 		}
 
-		// Warn once for file locale if no rules
 		if (!rulesHas(fileLocale)) {
 			warning(
 				!rulesHas('common') || rulesCount('common') === 0
-					? `No rules registered for both of common and “${fileLocale}” locales.`
-					: `No rules registered for locale “${fileLocale}”, only common rules will be applied.`,
+					? `No rules registered for both of common and "${fileLocale}" locales.`
+					: `No rules registered for locale "${fileLocale}", only common rules will be applied.`,
 				config.logs
 			);
 		}
