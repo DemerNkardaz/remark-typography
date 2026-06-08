@@ -56,6 +56,51 @@ function warning(message: string, showLogs: boolean): void {
 	}
 }
 
+/**
+ * Remark plugin that applies typography rules to MDX text nodes.
+ *
+ * Processes all non-excluded text nodes in two sequential phases:
+ * 1. **String phase** — `replace`, `transform`, and `function` rules that return a string.
+ *    Text is protected (URLs, emails, code spans, etc. are shielded) before rules run,
+ *    then unprotected afterward.
+ * 2. **Node phase** — `node` and `function` rules that return `Node[]`.
+ *    Text nodes are split into mixed text/element arrays and spliced back into the tree.
+ *
+ * Excluded node types (never modified): `code`, `inlineCode`, `math`, `inlineMath`,
+ * `html`, `yaml`, `toml`.
+ *
+ * Locale is resolved per-node in this order:
+ * - `lang` / `language` / `locale` attribute on JSX elements
+ * - `locale` / `lang` / `language` key in YAML frontmatter
+ * - `options.locale`
+ * - `'en'` (fallback)
+ *
+ * @param options - Plugin configuration
+ * @param options.locale - Default locale for typography rules. Default: `'en'`
+ * @param options.initDefaultRules - Register all built-in rules from `@yalla/typography-rules` on init. Default: `true`
+ * @param options.plugins - Custom rule plugins to register before processing. Each entry is a `() => () => void` factory.
+ * @param options.logs - Emit console warnings for missing locale rules and rule-level errors. Default: `false`
+ *
+ * @returns A unified/remark transformer function `(tree: Root) => void`
+ *
+ * @example
+ * // vite.config.ts
+ * import remarkTypography from '@yalla/remark-typography';
+ * import remarkFrontmatter from 'remark-frontmatter';
+ *
+ * remarkPlugins: [
+ *   remarkFrontmatter,
+ *   [remarkTypography, { locale: 'ru', logs: true }],
+ * ]
+ *
+ * @example
+ * // With a custom plugin
+ * import myRules from './plugins/myRules';
+ *
+ * remarkPlugins: [
+ *   [remarkTypography, { plugins: [myRules], locale: 'de' }],
+ * ]
+ */
 export function remarkTypography(options: RemarkTypographyOptions = {} as RemarkTypographyOptions) {
 	const config = {
 		initDefaultRules: true,
