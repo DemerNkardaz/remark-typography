@@ -6,6 +6,7 @@ notation, ruby annotations, and more — driven by the
 [@yalla/typography-rules](https://github.com/DemerNkardaz/typography-rules)
 rule engine.
 
+Built on [@yalla/typography-core](https://github.com/DemerNkardaz/typography-core).
 Designed specifically for MDX. Correct behaviour with plain Markdown (`.md`)
 files is not guaranteed.
 
@@ -41,9 +42,6 @@ export default {
             remarkTypography,
             {
               locale: 'en',
-              initTypographyRules: true,
-              logs: false,
-              plugins: [],
             },
           ],
         ],
@@ -58,21 +56,18 @@ export default {
 ## Options
 
 ```typescript
-export interface RemarkTypographyOptions {
-  locale?: string;
-  initTypographyRules?: boolean;
-  plugins?: (() => () => void)[];
-  logs?: boolean;
-}
+export type RemarkTypographyOptions = TypographyCoreOptions;
 ```
 
-| Option             | Type                   | Default  | Description                                                                                   |
-| ------------------ | ---------------------- | -------- | --------------------------------------------------------------------------------------------- |
-| `locale`           | `string`               | `'en'`   | Default locale used for typography rules                                                      |
-| `initTypographyRules` | `boolean`              | `true`   | Automatically registers all built-in rules from `@yalla/typography-rules` on plugin init      |
-| `initMarkupRules` | `boolean`              | `false`   | Automatically registers all built-in markup rules from `@yalla/typography-rules` on plugin init      |
-| `plugins`          | `(() => () => void)[]` | `[]`     | Custom rule plugins to register before processing. Each plugin is a factory returning a thunk |
-| `logs`             | `boolean`              | `false`  | Enables console warnings for missing locale rules and rule errors during processing           |
+All options come from `@yalla/typography-core`. See its documentation for the full reference.
+
+| Option                | Type                   | Default | Description                                                                                    |
+| --------------------- | ---------------------- | ------- | ---------------------------------------------------------------------------------------------- |
+| `locale`              | `string`               | `'en'`  | Default locale used for typography rules                                                       |
+| `initTypographyRules` | `boolean`              | `true`  | Automatically registers all built-in rules from `@yalla/typography-rules` on plugin init       |
+| `initMarkupRules`     | `boolean`              | `false` | Automatically registers all built-in markup rules from `@yalla/typography-rules` on plugin init |
+| `plugins`             | `(() => () => void)[]` | `[]`    | Custom rule plugins to register before processing. Each plugin is a factory returning a thunk  |
+| `logs`                | `boolean`              | `false` | Enables console warnings for missing locale rules and rule errors during processing            |
 
 ---
 
@@ -121,7 +116,7 @@ The following node types are never processed — their content is passed through
 | `code`       | Fenced code blocks                          |
 | `inlineCode` | Inline code spans                           |
 | `math`       | Block math (remark-math)                    |
-| `inlineMath` | Inline math (remark-math)                  |
+| `inlineMath` | Inline math (remark-math)                   |
 | `html`       | Raw HTML blocks                             |
 | `yaml`       | YAML frontmatter (consumed for locale only) |
 | `toml`       | TOML frontmatter                            |
@@ -136,8 +131,8 @@ Each text node goes through two sequential phases:
 
 Text content is joined across sibling text nodes, wrapped with `protect()` to
 shield URLs, emails, code spans, and other structured content from modification,
-then all matching string rules are applied in weight order, and finally
-`unprotect()` restores the original protected spans.
+then all matching string rules are applied in weight order via `applyRules` from
+`@yalla/typography-core`, and finally `unprotect()` restores the original protected spans.
 
 **Phase 2 — Node rules** (`node` rules and `function` rules returning `Node[]`)
 
@@ -209,43 +204,72 @@ export default {
 
 ---
 
+## Building a Derived Plugin
+
+`remarkTypography` is itself built with `createTypographyPlugin` from `@yalla/typography-core`.
+If you need a plugin with different defaults or additional options, use the same factory directly
+instead of wrapping `remarkTypography`:
+
+```typescript
+import { createTypographyPlugin, type TypographyCoreOptions } from '@yalla/typography-core';
+import { myRules } from './rules';
+
+interface MyPluginOptions extends TypographyCoreOptions {
+  strictMode?: boolean;
+}
+
+export const myTypographyPlugin = createTypographyPlugin<MyPluginOptions, Root>({
+  defaultOptions: {
+    locale: 'de',
+    plugins: [myRules],
+  },
+  createHandler: (config) => (tree: Root) => {
+    // your MDX/remark AST traversal
+  },
+});
+```
+
+See [@yalla/typography-core](https://github.com/DemerNkardaz/typography-core) for full factory documentation.
+
+---
+
 ## Plugin Order
 
 ### Place `remark-typography` AFTER these plugins
 
-| Plugin                                         | Reason                                                                                            |
-| ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `remark-frontmatter`                           | Isolates YAML/TOML frontmatter and exposes it for locale detection                               |
-| `remark-mdx-frontmatter`                       | Same — exports frontmatter as named exports                                                       |
-| `remark-gfm`                                   | Adds tables, strikethrough, task lists, autolinks — typography must see the final node structure  |
-| `remark-math`                                  | Introduces `math` / `inlineMath` nodes — must exist before typography skips them                 |
-| `remark-directive`                             | Adds container/leaf/inline directive nodes before typography processes remaining text             |
-| `remark-github`                                | Resolves mentions, issue refs, and commit links into nodes                                        |
-| `remark-footnotes` / `remark-gfm` (footnotes)  | Footnote nodes must be created before text inside them is processed                              |
-| `remark-extract-toc` / `remark-toc`            | TOC is built from headings — headings must exist in the tree first                               |
-| `remark-emoji`                                 | Converts `:emoji:` shortcodes to Unicode — run before so output is not re-processed              |
-| `remark-breaks`                                | Converts soft breaks to `<br>` — structural change should precede text transformation            |
-| `remark-unwrap-images`                         | Moves image nodes up — structural, must precede text passes                                      |
-| `remark-mdx`                                   | Parses MDX expressions and JSX nodes — their text content must be in the tree first              |
+| Plugin                                          | Reason                                                                                           |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `remark-frontmatter`                            | Isolates YAML/TOML frontmatter and exposes it for locale detection                              |
+| `remark-mdx-frontmatter`                        | Same — exports frontmatter as named exports                                                      |
+| `remark-gfm`                                    | Adds tables, strikethrough, task lists, autolinks — typography must see the final node structure |
+| `remark-math`                                   | Introduces `math` / `inlineMath` nodes — must exist before typography skips them                |
+| `remark-directive`                              | Adds container/leaf/inline directive nodes before typography processes remaining text            |
+| `remark-github`                                 | Resolves mentions, issue refs, and commit links into nodes                                       |
+| `remark-footnotes` / `remark-gfm` (footnotes)  | Footnote nodes must be created before text inside them is processed                             |
+| `remark-extract-toc` / `remark-toc`            | TOC is built from headings — headings must exist in the tree first                              |
+| `remark-emoji`                                  | Converts `:emoji:` shortcodes to Unicode — run before so output is not re-processed             |
+| `remark-breaks`                                 | Converts soft breaks to `<br>` — structural change should precede text transformation           |
+| `remark-unwrap-images`                          | Moves image nodes up — structural, must precede text passes                                     |
+| `remark-mdx`                                   | Parses MDX expressions and JSX nodes — their text content must be in the tree first             |
 
 ### Place `remark-typography` BEFORE these plugins
 
-| Plugin                                  | Reason                                                                           |
-| --------------------------------------- | -------------------------------------------------------------------------------- |
-| `remark-reading-time`                   | Counts words over text nodes — should see the final transformed text             |
-| `remark-reading-time-export`            | Re-exports the reading time value — must come after the count is done            |
-| `remark-stringify`                      | Serializes the tree back to Markdown — must see final text                       |
-| `remark-rehype`                         | Converts mdast → hast for HTML pipeline — carries final text values into rehype  |
-| `remark-mdx-export` / custom exporters  | Export text content as JS variables — must reflect final typography              |
+| Plugin                                  | Reason                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------- |
+| `remark-reading-time`                   | Counts words over text nodes — should see the final transformed text            |
+| `remark-reading-time-export`            | Re-exports the reading time value — must come after the count is done           |
+| `remark-stringify`                      | Serializes the tree back to Markdown — must see final text                      |
+| `remark-rehype`                         | Converts mdast → hast for HTML pipeline — carries final text values into rehype |
+| `remark-mdx-export` / custom exporters  | Export text content as JS variables — must reflect final typography             |
 
 ### Order does not matter relative to these plugins
 
-| Plugin                           | Reason                                                                                  |
-| -------------------------------- | --------------------------------------------------------------------------------------- |
-| `remark-slug` / `rehype-slug`    | Operates on `id` generation from heading text — runs in rehype, separate pipeline       |
-| `remark-code-titles`             | Parses code block meta strings, never touches text nodes                                |
-| `remark-prism` / `remark-shiki`  | Syntax highlighting — operates on code node values, which are excluded from typography  |
-| `remark-attr`                    | Parses inline attribute syntax `{.class}` — structural only, no text node mutation      |
+| Plugin                           | Reason                                                                                 |
+| -------------------------------- | -------------------------------------------------------------------------------------- |
+| `remark-slug` / `rehype-slug`    | Operates on `id` generation from heading text — runs in rehype, separate pipeline      |
+| `remark-code-titles`             | Parses code block meta strings, never touches text nodes                               |
+| `remark-prism` / `remark-shiki` | Syntax highlighting — operates on code node values, which are excluded from typography |
+| `remark-attr`                    | Parses inline attribute syntax `{.class}` — structural only, no text node mutation     |
 
 ---
 
@@ -253,8 +277,11 @@ export default {
 
 ```typescript
 import type { RemarkTypographyOptions } from '@yalla/remark-typography';
+import type { TypographyCoreOptions, ResolvedCoreConfig } from '@yalla/typography-core';
 ```
 
-| Type                      | Description                          |
-| ------------------------- | ------------------------------------ |
-| `RemarkTypographyOptions` | Options object passed to the plugin  |
+| Type                      | Source                   | Description                         |
+| ------------------------- | ------------------------ | ------------------------------------ |
+| `RemarkTypographyOptions` | `@yalla/remark-typography` | Alias for `TypographyCoreOptions`   |
+| `TypographyCoreOptions`   | `@yalla/typography-core`  | Base options interface              |
+| `ResolvedCoreConfig`      | `@yalla/typography-core`  | Fully resolved config (all required) |

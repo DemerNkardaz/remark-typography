@@ -16,9 +16,9 @@ import {
 import { joinNodes, splitNodes } from '@yalla/typography-rules/helpers';
 
 import {
-	applyRules,
-	initRules,
+	createTypographyPlugin,
 	getFrontmatterLocale,
+	applyRules,
 	warning,
 	type TypographyCoreOptions,
 } from '@yalla/typography-core';
@@ -50,21 +50,8 @@ function getJsxLang(node: MdxJsxFlowElement | MdxJsxTextElement): string | undef
 	return undefined;
 }
 
-export function remarkTypography(options: RemarkTypographyOptions = {}) {
-	const config = {
-		initTypographyRules: true,
-		initMarkupRules: false,
-		logs: false,
-		locale: 'en',
-		plugins: [],
-		...options,
-	} satisfies TypographyCoreOptions;
-
-	initRules(config);
-
-	config.plugins?.forEach((plugin) => plugin()());
-
-	return (tree: Root) => {
+export const remarkTypography = createTypographyPlugin({
+	createHandler: (config) => (tree: Root) => {
 		let frontmatterLocale: string | undefined;
 		visit(tree, 'yaml', (node: Yaml) => {
 			const data = yaml.load(node.value) as Record<string, unknown> | null;
@@ -214,7 +201,5 @@ export function remarkTypography(options: RemarkTypographyOptions = {}) {
 		if (rules.length === 0) return;
 
 		processNode(tree, [fileLocale]);
-	};
-}
-
-export default remarkTypography;
+	},
+});
