@@ -123,6 +123,8 @@ export const remarkTypography = createTypographyPlugin({
 		function processNode(node: Root | RootContent, localeStack: string[]): void {
 			if (EXCLUDED_TYPES.has(node.type)) return;
 
+			if (node.data?.skipTypography) return;
+
 			const currentLocale = localeStack[localeStack.length - 1] ?? fileLocale;
 
 			if (JSX_TYPES.has(node.type)) {
