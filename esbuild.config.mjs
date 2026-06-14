@@ -4,7 +4,7 @@ import { readdirSync, statSync } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 
 import pkg from './package.json' with { type: 'json' };
-const limit = pkg.bundleSizeLimit;
+const limit = sizeToKB(pkg.bundleSizeLimit ?? 102400);
 
 await rm('dist', {
 	recursive: true,
@@ -48,11 +48,15 @@ function getDirSize(dir) {
 	}, 0);
 }
 
-const totalSize = getDirSize('dist');
+function sizeToKB(size) {
+	return (size / 1024).toFixed(2);
+}
+
+const totalSize = sizeToKB(getDirSize('dist'));
 
 if (totalSize > limit) {
-	console.log('\x1b[33m%s\x1b[0m', `Bundle too large: ${totalSize} > ${limit}`);
+	console.log('\x1b[33m%s\x1b[0m', `Bundle too large: ${totalSize}KB > ${limit}KB`);
 	process.exit(1);
 } else {
-	console.log('\x1b[32m%s\x1b[0m', `Bundle size: ${totalSize} < ${limit}`);
+	console.log('\x1b[32m%s\x1b[0m', `Bundle size: ${totalSize}KB < ${limit}KB`);
 }
