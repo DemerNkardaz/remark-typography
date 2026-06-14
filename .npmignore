@@ -27,6 +27,8 @@ coverage/
 *.tsbuildinfo
 
 # Other
+.gitattributes
+.gitignore
 .changeset/
 .vscode/
 
@@ -34,6 +36,7 @@ coverage/
 dist/**/*.map
 dist/**/*.d.ts.map
 dist/meta-*.json
+dist/**/meta-*.json
 dist/**/*.test.d.ts
 dist/**/*.test.d.ts.map
 dist/**/*.spec.d.ts

@@ -1,7 +1,7 @@
 {
-  "name": "@yalla/remark-typography",
+  "name": "@nkardaz/remark-typography",
   "version": "1.0.0",
-  "description": "Your package description here",
+  "description": "Implements typography rules for MDX files.",
   "license": "MIT",
   "author": "Yalla Nkardaz",
   "keywords": [
@@ -20,7 +20,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/DemerNkardaz/remark-typography"
+    "url": "git+https://github.com/DemerNkardaz/remark-typography.git"
   },
   "homepage": "https://github.com/DemerNkardaz/remark-typography#readme",
   "bugs": {
@@ -37,13 +37,7 @@
       "require": "./dist/index.cjs"
     }
   },
-  "files": [
-    "dist",
-    "package.json",
-    "README.md",
-    "LICENSE"
-  ],
-  "bundleSizeLimit": 102400,
+  "bundleSizeLimit": 20480,
   "sideEffects": false,
   "engines": {
     "node": ">=24.0.0"
@@ -76,7 +70,6 @@
     "mdast-util-mdx-jsx": "^3.2.0",
     "prettier": "^3.0.0",
     "remark-parse": "^11.0.0",
-    "tsup": "^8.5.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.1",
     "unified": "^11.0.5",
@@ -84,8 +77,8 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
-    "@yalla/typography-core": "file:../typography-core",
-    "@yalla/typography-rules": "file:../typography-rules",
+    "@nkardaz/typography-core": "1.0.1",
+    "@nkardaz/typography-rules": "1.0.0",
     "js-yaml": "^4.2.0",
     "unist-util-visit": "^5.1.0"
   }

@@ -12,8 +12,8 @@ import {
 	nodeToMdast,
 	type NodeFunctionRule,
 	type FunctionRule,
-} from '@yalla/typography-rules';
-import { joinNodes, splitNodes } from '@yalla/typography-rules/helpers';
+} from '@nkardaz/typography-rules';
+import { joinNodes, splitNodes } from '@nkardaz/typography-rules/helpers';
 
 import {
 	createTypographyPlugin,
@@ -21,7 +21,7 @@ import {
 	applyRules,
 	warning,
 	type TypographyCoreOptions,
-} from '@yalla/typography-core';
+} from '@nkardaz/typography-core';
 
 const EXCLUDED_TYPES = new Set([
 	'code',

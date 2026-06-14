@@ -1,12 +1,12 @@
-# @yalla/remark-typography
+# @nkardaz/remark-typography
 
 A Remark plugin that automatically applies typography rules to MDX files.
 Handles smart quotes, punctuation correction, non-breaking spaces, chemical
 notation, ruby annotations, and more — driven by the
-[@yalla/typography-rules](https://github.com/DemerNkardaz/typography-rules)
+[@nkardaz/typography-rules](https://github.com/DemerNkardaz/typography-rules)
 rule engine.
 
-Built on [@yalla/typography-core](https://github.com/DemerNkardaz/typography-core).
+Built on [@nkardaz/typography-core](https://github.com/DemerNkardaz/typography-core).
 Designed specifically for MDX. Correct behaviour with plain Markdown (`.md`)
 files is not guaranteed.
 
@@ -15,7 +15,7 @@ files is not guaranteed.
 ## Installation
 
 ```bash
-npm i -D @yalla/remark-typography
+npm i -D @nkardaz/remark-typography
 ```
 
 > **Requires Node.js ≥ 24.0.0**
@@ -27,7 +27,7 @@ npm i -D @yalla/remark-typography
 `vite.config.ts`
 
 ```typescript
-import remarkTypography from '@yalla/remark-typography';
+import remarkTypography from '@nkardaz/remark-typography';
 import remarkFrontmatter from 'remark-frontmatter';
 
 export default {
@@ -59,13 +59,13 @@ export default {
 export type RemarkTypographyOptions = TypographyCoreOptions;
 ```
 
-All options come from `@yalla/typography-core`. See its documentation for the full reference.
+All options come from `@nkardaz/typography-core`. See its documentation for the full reference.
 
 | Option                | Type                   | Default | Description                                                                                    |
 | --------------------- | ---------------------- | ------- | ---------------------------------------------------------------------------------------------- |
 | `locale`              | `string`               | `'en'`  | Default locale used for typography rules                                                       |
-| `initTypographyRules` | `boolean`              | `true`  | Automatically registers all built-in rules from `@yalla/typography-rules` on plugin init       |
-| `initMarkupRules`     | `boolean`              | `false` | Automatically registers all built-in markup rules from `@yalla/typography-rules` on plugin init |
+| `initTypographyRules` | `boolean`              | `true`  | Automatically registers all built-in rules from `@nkardaz/typography-rules` on plugin init       |
+| `initMarkupRules`     | `boolean`              | `false` | Automatically registers all built-in markup rules from `@nkardaz/typography-rules` on plugin init |
 | `plugins`             | `(() => () => void)[]` | `[]`    | Custom rule plugins to register before processing. Each plugin is a factory returning a thunk  |
 | `logs`                | `boolean`              | `false` | Enables console warnings for missing locale rules and rule errors during processing            |
 
@@ -140,7 +140,7 @@ Each text node goes through two sequential phases:
 Text content is joined across sibling text nodes, wrapped with `protect()` to
 shield URLs, emails, code spans, and other structured content from modification,
 then all matching string rules are applied in weight order via `applyRules` from
-`@yalla/typography-core`, and finally `unprotect()` restores the original protected spans.
+`@nkardaz/typography-core`, and finally `unprotect()` restores the original protected spans.
 
 **Phase 2 — Node rules** (`node` rules and `function` rules returning `Node[]`)
 
@@ -155,15 +155,15 @@ Both phases are applied per locale context. When a JSX element declares a `lang`
 
 ## Custom Plugins
 
-Register additional rules using `@yalla/typography-rules` before passing the
+Register additional rules using `@nkardaz/typography-rules` before passing the
 plugin to `remarkTypography`.
 
 `plugins/islenskaRules.ts`
 
 ```typescript
-import { registerRule, newRule } from '@yalla/typography-rules';
-import { smartQuotes } from '@yalla/typography-rules/functions';
-import { PUNCTUATION } from '@yalla/typography-rules/glyphs';
+import { registerRule, newRule } from '@nkardaz/typography-rules';
+import { smartQuotes } from '@nkardaz/typography-rules/functions';
+import { PUNCTUATION } from '@nkardaz/typography-rules/glyphs';
 
 export default function islenskaRules() {
   return () => {
@@ -195,7 +195,7 @@ export default function islenskaRules() {
 `vite.config.ts`
 
 ```typescript
-import remarkTypography from '@yalla/remark-typography';
+import remarkTypography from '@nkardaz/remark-typography';
 import islenskaRules from './plugins/islenskaRules';
 
 export default {
@@ -216,12 +216,12 @@ export default {
 
 ## Building a Derived Plugin
 
-`remarkTypography` is itself built with `createTypographyPlugin` from `@yalla/typography-core`.
+`remarkTypography` is itself built with `createTypographyPlugin` from `@nkardaz/typography-core`.
 If you need a plugin with different defaults or additional options, use the same factory directly
 instead of wrapping `remarkTypography`:
 
 ```typescript
-import { createTypographyPlugin, type TypographyCoreOptions } from '@yalla/typography-core';
+import { createTypographyPlugin, type TypographyCoreOptions } from '@nkardaz/typography-core';
 import { myRules } from './rules';
 
 interface MyPluginOptions extends TypographyCoreOptions {
@@ -239,7 +239,7 @@ export const myTypographyPlugin = createTypographyPlugin<MyPluginOptions, Root>(
 });
 ```
 
-See [@yalla/typography-core](https://github.com/DemerNkardaz/typography-core) for full factory documentation.
+See [@nkardaz/typography-core](https://github.com/DemerNkardaz/typography-core) for full factory documentation.
 
 ---
 
@@ -286,12 +286,12 @@ See [@yalla/typography-core](https://github.com/DemerNkardaz/typography-core) fo
 ## TypeScript
 
 ```typescript
-import type { RemarkTypographyOptions } from '@yalla/remark-typography';
-import type { TypographyCoreOptions, ResolvedCoreConfig } from '@yalla/typography-core';
+import type { RemarkTypographyOptions } from '@nkardaz/remark-typography';
+import type { TypographyCoreOptions, ResolvedCoreConfig } from '@nkardaz/typography-core';
 ```
 
 | Type                      | Source                   | Description                         |
 | ------------------------- | ------------------------ | ------------------------------------ |
-| `RemarkTypographyOptions` | `@yalla/remark-typography` | Alias for `TypographyCoreOptions`   |
-| `TypographyCoreOptions`   | `@yalla/typography-core`  | Base options interface              |
-| `ResolvedCoreConfig`      | `@yalla/typography-core`  | Fully resolved config (all required) |
+| `RemarkTypographyOptions` | `@nkardaz/remark-typography` | Alias for `TypographyCoreOptions`   |
+| `TypographyCoreOptions`   | `@nkardaz/typography-core`  | Base options interface              |
+| `ResolvedCoreConfig`      | `@nkardaz/typography-core`  | Fully resolved config (all required) |
