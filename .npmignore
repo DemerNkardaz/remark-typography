@@ -7,14 +7,16 @@ src/
 *.config.mjs
 tsconfig.json
 tsconfig.build.json
-verify-template.js
+tsconfig.app.json
 
 # Dev tooling
+tools/
 .editorconfig
 .npmrc
 .eslintrc*
 eslint.config.*
 prettier.config.*
+vitest.config.*
 
 # CI/CD
 .github/
@@ -26,6 +28,7 @@ coverage/
 
 # Other
 .changeset/
+.vscode/
 
 # Dist
 dist/**/*.map
@@ -35,3 +38,5 @@ dist/**/*.test.d.ts
 dist/**/*.test.d.ts.map
 dist/**/*.spec.d.ts
 dist/**/*.spec.d.ts.map
+
+yal.toml

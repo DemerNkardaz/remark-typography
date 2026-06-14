@@ -121,6 +121,14 @@ The following node types are never processed — their content is passed through
 | `yaml`       | YAML frontmatter (consumed for locale only) |
 | `toml`       | TOML frontmatter                            |
 
+Any node can also be excluded programmatically by setting `skipTypography: true`
+on its `data` object:
+
+```typescript
+// inside a remark plugin or unified transform
+node.data = { ...node.data, skipTypography: true };
+```
+
 ---
 
 ## Processing Pipeline
@@ -140,6 +148,8 @@ Text nodes that survived phase 1 are walked again. Rules that return a node
 tree (e.g. `chemNotation`, `wrapWithTag`, `rubyText`) split text nodes into
 mixed arrays of text and element nodes, which are spliced back into the parent's
 children.
+
+Both phases are applied per locale context. When a JSX element declares a `lang`, `language`, or `locale` attribute, a new locale context is pushed for that element's subtree before either phase runs — and popped on exit. Text inside `<p lang="ru">` goes through both phases with Russian rules, even if the surrounding file uses a different locale. See [Locale Resolution](#locale-resolution) for the full priority order.
 
 ---
 
