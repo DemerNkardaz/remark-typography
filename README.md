@@ -22,6 +22,23 @@ npm i -D @nkardaz/remark-typography
 
 ---
 
+## Family of @nkardaz typography packages
+
+<!-- prettier-ignore -->
+| Package | Type | Details |
+| ------- | ---- | ------- |
+| [Typography Rules](https://github.com/DemerNkardaz/typography-rules) | Rules engine | [![](https://img.shields.io/npm/v/%40nkardaz%2Ftypography-rules?logo=npm&labelColor=cb0000&color=fdfdfd)](https://www.npmjs.com/package/%40nkardaz%2Ftypography-rules) ![](https://img.shields.io/npm/dm/%40nkardaz%2Ftypography-rules?label=%F0%9F%A1%87&labelColor=cb0000&color=fdfdfd) ![](https://img.shields.io/npm/last-update/%40nkardaz%2Ftypography-rules?label=%F0%9F%A1%85&labelColor=cb0000&color=fdfdfd) |
+| [Typography Core](https://github.com/DemerNkardaz/typography-core) | Core | [![](https://img.shields.io/npm/v/%40nkardaz%2Ftypography-core?logo=npm&labelColor=cb0000&color=fdfdfd)](https://www.npmjs.com/package/%40nkardaz%2Ftypography-core) ![](https://img.shields.io/npm/dm/%40nkardaz%2Ftypography-core?label=%F0%9F%A1%87&labelColor=cb0000&color=fdfdfd) ![](https://img.shields.io/npm/last-update/%40nkardaz%2Ftypography-core?label=%F0%9F%A1%85&labelColor=cb0000&color=fdfdfd) |
+| **Adapters** | | |
+| [Remark Typography](https://github.com/DemerNkardaz/remark-typography) | Remark adapter | [![](https://img.shields.io/npm/v/%40nkardaz%2Fremark-typography?logo=npm&labelColor=cb0000&color=fdfdfd)](https://www.npmjs.com/package/%40nkardaz%2Fremark-typography) ![](https://img.shields.io/npm/dm/%40nkardaz%2Fremark-typography?label=%F0%9F%A1%87&labelColor=cb0000&color=fdfdfd) ![](https://img.shields.io/npm/last-update/%40nkardaz%2Fremark-typography?label=%F0%9F%A1%85&labelColor=cb0000&color=fdfdfd) |
+| [Rehype Typography](https://github.com/DemerNkardaz/rehype-typography) | Rehype adapter | [![](https://img.shields.io/badge/Coming-Soon%E2%80%A6-0?labelColor=fee036&color=fdfdfd)]() |
+| [Obsidian Typography](https://github.com/DemerNkardaz/obsidian-typography) | Obsidian adapter | [![](https://img.shields.io/badge/Coming-Soon%E2%80%A6-0?labelColor=fee036&color=fdfdfd)]() |
+| [Vanilla Typography](https://github.com/DemerNkardaz/vanilla-typography) | HTML5 adapter | [![](https://img.shields.io/badge/Coming-Soon%E2%80%A6-0?labelColor=fee036&color=fdfdfd)]() |
+| **Plugins** | | |
+| [Preview Typography](https://github.com/DemerNkardaz/obsidian-preview-typography) | Obsidian plugin | [![](https://img.shields.io/badge/Coming-Soon%E2%80%A6-0?labelColor=fee036&color=fdfdfd)]() |
+
+---
+
 ## Quick Start
 
 `vite.config.ts`
