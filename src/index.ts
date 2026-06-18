@@ -1,7 +1,7 @@
 import { visit } from 'unist-util-visit';
 import type { Root, Text, Parent, Yaml, RootContent } from 'mdast';
 import type { MdxJsxFlowElement, MdxJsxTextElement } from 'mdast-util-mdx-jsx';
-import yaml from 'js-yaml';
+import { parse } from 'yaml';
 
 import {
 	getWeightedRules,
@@ -54,7 +54,7 @@ export const remarkTypography = createTypographyPlugin({
 	createHandler: (config) => (tree: Root) => {
 		let frontmatterLocale: string | undefined;
 		visit(tree, 'yaml', (node: Yaml) => {
-			const data = yaml.load(node.value) as Record<string, unknown> | null;
+			const data = parse(node.value) as Record<string, unknown> | null;
 			frontmatterLocale = getFrontmatterLocale(data);
 		});
 
@@ -205,3 +205,5 @@ export const remarkTypography = createTypographyPlugin({
 		processNode(tree, [fileLocale]);
 	},
 });
+
+export default remarkTypography;

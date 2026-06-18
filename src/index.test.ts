@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import remarkParse from 'remark-parse';
 import { unified } from 'unified';
-import type { Root, Heading, Blockquote, List } from 'mdast';
+import type { Root, Heading, Blockquote, List, RootContent, Yaml } from 'mdast';
 import { remarkTypography } from './index';
 
 // ---------------------------------------------------------------------------
@@ -39,6 +39,15 @@ function allText(markdown: string, locale: 'ru' | 'en' = 'ru'): string {
 }
 
 // ---------------------------------------------------------------------------
+// Manual-tree helper — runs the plugin against a hand-built mdast tree
+// instead of parsing a markdown string. Needed to cover frontmatter (`yaml`
+// node) and MDX JSX nodes (`mdxJsxFlowElement` / `mdxJsxTextElement`)
+// WITHOUT pulling in remark-frontmatter or remark-mdx as dependencies —
+// the plugin only cares about node shape, not how the tree was produced.
+// ---------------------------------------------------------------------------
+function transformTree(tree: Root, locale: 'ru' | 'en' = 'ru'): Root {
+	return unified().use(remarkTypography, { locale }).runSync(tree) as Root;
+}
 
 describe('remarkTypography', () => {
 	// -------------------------------------------------------------------------
@@ -148,6 +157,246 @@ describe('remarkTypography', () => {
 			expect(text).not.toContain('««');
 			expect(text).not.toContain('»»');
 			expect((text.match(/«/g) ?? []).length).toBe(1);
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// Frontmatter-driven locale resolution (`yaml` node + getFrontmatterLocale)
+	// -------------------------------------------------------------------------
+
+	describe('frontmatter locale resolution', () => {
+		it('uses the locale declared in frontmatter, overriding the option default', () => {
+			// Plugin configured with locale: 'en', but frontmatter declares 'ru' —
+			// frontmatter must win, so straight quotes become «» not “”.
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{ type: 'yaml', value: 'locale: ru' },
+					{
+						type: 'paragraph',
+						children: [{ type: 'text', value: 'Он сказал "привет".' }],
+					},
+				],
+			};
+
+			const result = transformTree(tree, 'en');
+			const paragraph = result.children.find(
+				(n: RootContent): n is RootContent => n.type === 'paragraph'
+			);
+			expect(textValues(paragraph!).join('')).toContain('«привет»');
+		});
+
+		it('falls back to the configured locale when frontmatter has no locale/lang/language field', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{ type: 'yaml', value: 'title: Some post' },
+					{
+						type: 'paragraph',
+						children: [{ type: 'text', value: 'Он сказал "привет".' }],
+					},
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			const paragraph = result.children.find(
+				(n: RootContent): n is RootContent => n.type === 'paragraph'
+			);
+			expect(textValues(paragraph!).join('')).toContain('«привет»');
+		});
+
+		it('does not modify the yaml node itself', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{ type: 'yaml', value: 'locale: ru\ntitle: "quoted title"' },
+					{
+						type: 'paragraph',
+						children: [{ type: 'text', value: 'Текст.' }],
+					},
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			const yamlNode = result.children.find((n: RootContent): n is Yaml => n.type === 'yaml');
+			expect(yamlNode!.value).toBe('locale: ru\ntitle: "quoted title"');
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// MDX JSX nodes — lang/language/locale attribute resolution and recursion
+	// -------------------------------------------------------------------------
+
+	describe('MDX JSX nodes', () => {
+		it('applies rules to text inside a flow JSX element using the file locale', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'mdxJsxFlowElement',
+						name: 'Note',
+						attributes: [],
+						children: [
+							{
+								type: 'paragraph',
+								children: [{ type: 'text', value: 'Он сказал "привет".' }],
+							},
+						],
+					} as unknown as Root['children'][number],
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			expect(textValues(result).join('')).toContain('«привет»');
+		});
+
+		it('switches locale for a JSX subtree based on the lang attribute', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'mdxJsxFlowElement',
+						name: 'Note',
+						attributes: [{ type: 'mdxJsxAttribute', name: 'lang', value: 'en' }],
+						children: [
+							{
+								type: 'paragraph',
+								children: [{ type: 'text', value: 'She said "hello".' }],
+							},
+						],
+					} as unknown as Root['children'][number],
+				],
+			};
+
+			// File locale is 'ru', but the JSX node declares lang="en" — its subtree
+			// must be processed with English rules (curly quotes, not «»).
+			const result = transformTree(tree, 'ru');
+			const text = textValues(result).join('');
+			expect(text).not.toContain('"hello"');
+			expect(text).not.toContain('«');
+		});
+
+		it('restores the outer locale after leaving a JSX subtree with its own lang', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'mdxJsxFlowElement',
+						name: 'Note',
+						attributes: [{ type: 'mdxJsxAttribute', name: 'lang', value: 'en' }],
+						children: [
+							{
+								type: 'paragraph',
+								children: [{ type: 'text', value: 'She said "hello".' }],
+							},
+						],
+					} as unknown as Root['children'][number],
+					{
+						type: 'paragraph',
+						children: [{ type: 'text', value: 'Он сказал "привет".' }],
+					},
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			const lastParagraph = result.children[result.children.length - 1];
+			expect(textValues(lastParagraph!).join('')).toContain('«привет»');
+		});
+
+		it('reads the language attribute as an alias for lang', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'mdxJsxFlowElement',
+						name: 'Note',
+						attributes: [{ type: 'mdxJsxAttribute', name: 'language', value: 'en' }],
+						children: [
+							{
+								type: 'paragraph',
+								children: [{ type: 'text', value: 'She said "hello".' }],
+							},
+						],
+					} as unknown as Root['children'][number],
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			expect(textValues(result).join('')).not.toContain('«');
+		});
+
+		it('applies rules inside inline (text) JSX elements', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						children: [
+							{ type: 'text', value: 'Текст до. ' },
+							{
+								type: 'mdxJsxTextElement',
+								name: 'b',
+								attributes: [],
+								children: [{ type: 'text', value: 'Слово "в кавычках"' }],
+							},
+							{ type: 'text', value: ' и после.' },
+						],
+					} as unknown as Root['children'][number],
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			expect(textValues(result).join('')).toContain('«в\u00A0кавычках»');
+		});
+
+		it('recurses into nested non-text children of a JSX element', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'mdxJsxFlowElement',
+						name: 'Card',
+						attributes: [],
+						children: [
+							{
+								type: 'blockquote',
+								children: [
+									{
+										type: 'paragraph',
+										children: [{ type: 'text', value: 'Цитата "внутри".' }],
+									},
+								],
+							},
+						],
+					} as unknown as Root['children'][number],
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			expect(textValues(result).join('')).toContain('«внутри»');
+		});
+	});
+
+	// -------------------------------------------------------------------------
+	// data.skipTypography escape hatch
+	// -------------------------------------------------------------------------
+
+	describe('skipTypography', () => {
+		it('skips a node entirely when data.skipTypography is set', () => {
+			const tree: Root = {
+				type: 'root',
+				children: [
+					{
+						type: 'paragraph',
+						data: { skipTypography: true },
+						children: [{ type: 'text', value: 'Он сказал "привет".' }],
+					},
+				],
+			};
+
+			const result = transformTree(tree, 'ru');
+			expect(textValues(result).join('')).toContain('"привет"');
+			expect(textValues(result).join('')).not.toContain('«');
 		});
 	});
 });
